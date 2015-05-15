@@ -5,21 +5,153 @@ output:
     keep_md: true
 ---
 
-
 ## Loading and preprocessing the data
 
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(cache = TRUE, warning = FALSE)
 
+setwd("D:/Coursera/Course materials for the Data Science Specialization/05_ReproducibleResearch/RepData_PeerAssessment1")
+```
+
+```{r}
+df <- read.csv("activity.csv")
+head(df)
+```
 
 ## What is mean total number of steps taken per day?
 
+For this part of the assignment, you can ignore the missing values in the dataset.
 
+1. Calculate the total number of steps taken per day
+
+2. Make a histogram of the total number of steps taken each day
+
+3. Calculate and report the mean and median of the total number of steps taken per day
+
+```{r}
+# 1
+steps.perday <- tapply(df$steps, df$date, sum)
+# 2
+hist(steps.perday, 
+     main = "Histogram of Number of Steps per day", 
+     xlab = "total number of steps taken each day", 
+     col = "grey")
+# 3
+steps.mean <- mean(steps.perday, na.rm=T)
+steps.mean
+steps.median <- median(steps.perday, na.rm=T)
+steps.median
+```
+
+* The mean total number of steps taken per day is **`r as.integer(steps.mean)`** steps.
+* The median total number of steps taken per day is **`r steps.median`** steps.
 
 ## What is the average daily activity pattern?
 
+1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
 
+```{r }
+steps.interval<- aggregate(steps ~ interval, data = df, mean, na.rm = TRUE)
+plot(steps ~ interval, data = steps.interval, type = "l",
+     main = ("Daily Average Steps by 5-minute Interval"), 
+     xlab = "5-minute Time Interval",
+     ylab = "Number of steps",
+     col = "limegreen")
+```
+
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r}
+which.max(steps.interval$steps)
+max.index <- steps.interval[104,1]
+max.index
+```
+
+* Interval **`r max.index`** contains the maximum number of steps, which means on average, the sample walks most on **08:35 A.M.**
 
 ## Imputing missing values
 
+1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
 
+```{r  the total number of rows with NAs}
+summary(df)
+# Alternatively,
+NA.total <- nrow(df[is.na(df$steps), ])
+NA.total
+```
+
+* There are **`r NA.total`** rows with missing values
+
+2. Fill all of the missing values with the mean for that 5-minute interval across all days
+
+3. Create a new dataset with the missing data filled in.
+
+```{r}
+# recall steps.interval
+head(steps.interval)
+tail(steps.interval)
+new.df <- merge(df, steps.interval, by = 'interval')
+head(new.df)
+new.df$steps.x[is.na(new.df$steps.x)] <- new.df$steps.y
+head(new.df)
+
+# remove temporary mean column
+new.df$steps.y <- NULL
+summary(new.df)
+
+# rename steps.x back to steps
+colnames(new.df)[2] <- "steps"
+head(new.df)
+```
+
+4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? 
+
+```{r}
+# The new histogram
+new.steps.perday <- tapply(new.df$steps, new.df$date, sum)
+
+hist(new.steps.perday, 
+     main = "Histogram of Number of Steps per day", 
+     xlab = "total number of steps taken each day", 
+     col = "grey")
+
+# The new and median
+new.steps.mean <- mean(new.steps.perday)
+new.steps.mean
+new.steps.median <- median(new.steps.perday)
+new.steps.median
+```
+
+Of course the values differ because this time we increase the denominator up to the total number of observations when calculating the mathematical mean by filling the missing values (at first we use `na.rm = T` to make the denominator smaller by **`r NA.total`** than the total)
+
+**What is the impact of imputing missing data on the estimates of the total daily number of steps?**
+
+* The mean will be absolutely smaller. 
+* The median will be smaller as well because we replace the NA's with relatively smaller number (we can compare the two histograms to see that the number of observations which lie in the zone 0-5000 increases significantly )
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+# Convert Date
+new.df$wday <- factor(ifelse(as.POSIXlt(as.Date(new.df$date))$wday%%6 == 0, "weekend", "weekday"))
+
+steps.interal.day = aggregate(steps ~ interval + wday, new.df, mean)
+
+library(ggplot2)
+ggplot(aes(x = interval/100, y = steps), data = steps.interal.day) +
+  geom_line() + 
+  facet_grid(wday ~ .) +
+  scale_x_continuous(breaks=seq(0,24,2), labels=paste(0:12*2,":00", sep="")) +
+  xlab('hourly time') +
+  ylab('average number of steps') +
+  ggtitle('Daily Activity Pattern')
+
+#Alterntively,
+ggplot(aes(x = interval/100, y = steps), data = steps.interal.day) +
+  geom_line(aes(color = wday) ) + 
+  scale_x_continuous(breaks=seq(0,24,2), labels=paste(0:12*2,":00", sep="")) +
+  xlab('hourly time') +
+  ylab('average number of steps') +
+  ggtitle('Daily Activity Pattern')
+```
+
